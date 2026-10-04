@@ -66,6 +66,14 @@ module MCycle
     reg [2*width-1:0] shifted_op1 = 0 ;
     reg [2*width-1:0] shifted_op2 = 0 ;
 
+    // Division sign handling. Signed division is done on absolute values,
+    // so the signs are remembered here and applied to the results at the end.
+    reg neg_q = 1'b0 ;   // negate the quotient at the end
+    reg neg_r = 1'b0 ;   // negate the remainder at the end
+    // Scratch value for one division step: {remainder, next dividend bit}.
+    // One bit wider than the operands so the left shift cannot lose the remainder's top bit.
+    reg [width:0] rem_ext ;
+
     // What each of the above becomes at the next edge. The computation is
     // written as a sequence of steps over these, so that the registers
     // themselves are only ever assigned with <= , in one place.
@@ -76,6 +84,10 @@ module MCycle
     reg [2*width-1:0] n_shifted_op2 ;
     reg [width-1:0] n_Result1 ;
     reg [width-1:0] n_Result2 ;
+    
+    //additional declare
+    reg n_neg_r;
+    reg n_neg_q;
 
     always@(*) begin : IDLE_PROCESS
         // default outputs
@@ -109,7 +121,10 @@ module MCycle
         n_shifted_op2 = shifted_op2 ;
         n_Result1 = Result1 ;
         n_Result2 = Result2 ;
+        n_neg_q = neg_q ;
+        n_neg_r = neg_r ;
         n_done = 1'b0 ;
+        rem_ext = {(width+1){1'b0}} ; // default, so that no latch is inferred
 
         // n_state == COMPUTING and state == IDLE implies we are just transitioning into COMPUTING
         if( RESET | (n_state == COMPUTING & state == IDLE) ) begin // 2nd condition is true during the very 1st clock cycle of the multiplication
@@ -117,12 +132,28 @@ module MCycle
             n_temp_sum = 0 ;
             n_shifted_op1 = { {width{~MCycleOp[0] & Operand1[width-1]}}, Operand1 } ; // sign extend the operands
             n_shifted_op2 = { {width{~MCycleOp[0] & Operand2[width-1]}}, Operand2 } ;
+        
+            // Division set-up. MCycleOp[0] = 0 means signed.
+            // Quotient is negative when the operand signs differ.
+            n_neg_q = ~MCycleOp[0] & (Operand1[width-1] ^ Operand2[width-1]) ;
+            // Remainder takes the sign of the dividend (RISC-V / truncating division).
+            n_neg_r = ~MCycleOp[0] & Operand1[width-1] ;
+
+            if( MCycleOp[1] ) begin // divide
+                // {remainder = 0, lower half = |dividend|}. As iterations proceed, dividend bits
+                // are shifted out of the top of the lower half and quotient bits shifted in at the bottom.
+                n_temp_sum    = { {width{1'b0}}, (~MCycleOp[0] & Operand1[width-1]) ? -Operand1 : Operand1 } ;
+                // |divisor|, zero extended. Never modified during the division.
+                n_shifted_op2 = { {width{1'b0}}, (~MCycleOp[0] & Operand2[width-1]) ? -Operand2 : Operand2 } ;
+            end
+        
         end
 
         // Guarded so that the cycle in which Busy falls - the one the processor uses to write the result back - does not run another iteration over it, and so that the results are held while idle.
         if( n_state == COMPUTING ) begin
             if( ~MCycleOp[1] ) begin // Multiply
                 // if( ~MCycleOp[0] ), takes 2*'width' cycles to execute, returns signed(Operand1)*signed(Operand2)
+
                 // if( MCycleOp[0] ), takes 'width' cycles to execute, returns unsigned(Operand1)*unsigned(Operand2)
                 if( n_shifted_op2[0] ) // add only if b0 = 1
                     n_temp_sum = n_temp_sum + n_shifted_op1 ; // partial product for multiplication
@@ -134,17 +165,50 @@ module MCycle
                     n_done = 1'b1 ;
 
                 n_count = n_count + 1 ;
+
+                // Product: upper half -> Result2, lower half -> Result1
+                n_Result2 = n_temp_sum[2*width-1 : width] ;
+                n_Result1 = n_temp_sum[width-1 : 0] ;
             end
             else begin // Supposed to be Divide. The dummy code below takes 1 cycle to execute, just returns the operands. Change this to signed [ if(~MCycleOp[0]) ] and unsigned [ if(MCycleOp[0]) ] division.
                 // TODO (students): replace the one-cycle division placeholder.
-                // It currently returns Operand1 in Result2 and Operand2 in Result1.
-                n_temp_sum[2*width-1 : width] = Operand1 ;
-                n_temp_sum[width-1 : 0] = Operand2 ;
-                n_done = 1'b1 ;
+                
+                // Shift {remainder, lower half} left by 1. rem_ext = new remainder with the
+                // old remainder MSB kept as bit 'width', and the next dividend bit as bit 0.
+                rem_ext = n_temp_sum[2*width-1 : width-1] ;
+
+                // Does the divisor fit into the partial remainder? (unsigned compare, both width+1 bits)
+                if( rem_ext >= {1'b0, n_shifted_op2[width-1:0]} ) begin
+                    rem_ext = rem_ext - {1'b0, n_shifted_op2[width-1:0]} ; // yes: subtract it
+                    // {new remainder, remaining dividend bits shifted up, quotient bit = 1}
+                    n_temp_sum = { rem_ext[width-1:0], n_temp_sum[width-2:0], 1'b1 } ;
+                end
+                else
+                    // no: keep the remainder as shifted ("restore"), quotient bit = 0
+                    n_temp_sum = { rem_ext[width-1:0], n_temp_sum[width-2:0], 1'b0 } ;
+
+                if( n_count == COUNT_LAST_W[7:0] ) // last iteration?
+                    n_done = 1'b1 ;
+
+                n_count = n_count + 1 ;
+
+                // Apply the signs. Only the value from the last iteration matters,
+                // since Busy is high (results ignored) until then.
+                // Quotient: lower half. Remainder: upper half.
+                n_Result1 = n_neg_q ? -n_temp_sum[width-1 : 0]         : n_temp_sum[width-1 : 0] ;
+                n_Result2 = n_neg_r ? -n_temp_sum[2*width-1 : width]   : n_temp_sum[2*width-1 : width] ;
+            
+
+
+                // // It currently returns Operand1 in Result2 and Operand2 in Result1.
+                // n_temp_sum[2*width-1 : width] = Operand1 ;
+                // n_temp_sum[width-1 : 0] = Operand2 ;
+                // n_done = 1'b1 ;
             end
 
-            n_Result2 = n_temp_sum[2*width-1 : width] ;
-            n_Result1 = n_temp_sum[width-1 : 0] ;
+            // change this below if you want to return the product in Result2 and Result1 instead of the operands
+            // n_Result2 = n_temp_sum[2*width-1 : width] ;
+            // n_Result1 = n_temp_sum[width-1 : 0] ;
         end
     end
 
@@ -158,6 +222,8 @@ module MCycle
         shifted_op2 <= n_shifted_op2 ;
         Result1 <= n_Result1 ;
         Result2 <= n_Result2 ;
+        neg_q <= n_neg_q ;
+        neg_r <= n_neg_r ;
     end
 
 endmodule
