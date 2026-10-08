@@ -91,6 +91,7 @@ module RV #(
     wire [1:0] ALUSrcB ;
     //wire [2:0] ImmSrc ;
     wire [3:0] ALUControl ;
+    wire [1:0] MCycleOp ;
 
     // PC_Logic signals
     //wire [1:0] PCS
@@ -105,6 +106,14 @@ module RV #(
     //wire [31:0] ALUResult ;
     wire [2:0] ALUFlags ;
     
+    // MCycle signal
+    wire Start ;
+    //wire [1:0] MCycleOp ;
+    wire [31:0] Operand1 ;
+    wire [31:0] Operand2 ;
+    wire [31:0] Result1 ;
+    wire [31:0] Result2 ;
+    wire Busy;
     // ProgramCounter signals
     //wire CLK ;
     //wire RESET ;
@@ -168,7 +177,8 @@ module RV #(
                     ALUSrcA,
                     ALUSrcB,
                     ImmSrc,
-                    ALUControl
+                    ALUControl,
+                    MCycleOp
                 );
                 
     // Instantiate PC_Logic
@@ -203,6 +213,18 @@ module RV #(
                     ALUFlags
                 );                
     
+    MCycle #(.width(32)) MCycle1(
+                CLK,
+                RESET,
+                Start,
+                MCycleOp,
+                Operand1,
+                Operand2,
+                Result1,
+                Result2,
+                Busy
+                );
+
     // Instantiate ProgramCounter
     always @(*) begin
         case(PCSrc)
@@ -213,12 +235,12 @@ module RV #(
             default: PC_IN = PC + 4;
         endcase
     end
-    assign WE_PC = 1; // right now no pipeline, just enable it
+    assign WE_PC = (Busy == 1'b1) ? 0 : 1; // Only change PC if the cpu is not stall by multicycle instruction
     ProgramCounter #(.PC_INIT(PC_INIT)) ProgramCounter1(
                     CLK,
                     RESET,
                     WE_PC,    
                     PC_IN,
                     PC  
-                );                         
+                );
 endmodule
