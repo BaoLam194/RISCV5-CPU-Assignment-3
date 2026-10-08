@@ -178,7 +178,8 @@ module RV #(
                     ALUSrcB,
                     ImmSrc,
                     ALUControl,
-                    MCycleOp
+                    MCycleOp,
+                    Start
                 );
                 
     // Instantiate PC_Logic
@@ -213,6 +214,9 @@ module RV #(
                     ALUFlags
                 );                
     
+    // multiply and divide is DP Reg instruction, so no need to have multiplex for this
+    assign Operand1 = ALUSrcA;
+    assign Operand1 = ALUSrcB;
     MCycle #(.width(32)) MCycle1(
                 CLK,
                 RESET,
