@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="test_Wrapper_BF_behav.wdb" id="1">
+         <top_modules>
+            <top_module name="\$unit_test_Wrapper_Basic_Functionality_v " />
+            <top_module name="glbl" />
+            <top_module name="test_Wrapper_BF" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="0.000 ns"></ZoomStartTime>
+      <ZoomEndTime time="517.001 ns"></ZoomEndTime>
+      <Cursor1Time time="168.500 ns"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="202"></NameColumnWidth>
+      <ValueColumnWidth column_width="72"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="18" />
+   <wvobject fp_name="/test_Wrapper_BF/DIP" type="array">
+      <obj_property name="ElementShortName">DIP[15:0]</obj_property>
+      <obj_property name="ObjectShortName">DIP[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/CLK" type="logic">
+      <obj_property name="ElementShortName">CLK</obj_property>
+      <obj_property name="ObjectShortName">CLK</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/PB" type="array">
+      <obj_property name="ElementShortName">PB[2:0]</obj_property>
+      <obj_property name="ObjectShortName">PB[2:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/LED_OUT" type="array">
+      <obj_property name="ElementShortName">LED_OUT[7:0]</obj_property>
+      <obj_property name="ObjectShortName">LED_OUT[7:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/LED_PC" type="array">
+      <obj_property name="ElementShortName">LED_PC[6:0]</obj_property>
+      <obj_property name="ObjectShortName">LED_PC[6:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/dut/RV1/RegFile1/RegBank" type="array">
+      <obj_property name="ElementShortName">RegBank[0:31][31:0]</obj_property>
+      <obj_property name="ObjectShortName">RegBank[0:31][31:0]</obj_property>
+      <obj_property name="isExpanded"></obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/dut/RV1/RegFile1/WD" type="array">
+      <obj_property name="ElementShortName">WD[31:0]</obj_property>
+      <obj_property name="ObjectShortName">WD[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/dut/RV1/Decoder1/MemtoReg" type="array">
+      <obj_property name="ElementShortName">MemtoReg[1:0]</obj_property>
+      <obj_property name="ObjectShortName">MemtoReg[1:0]</obj_property>
+      <obj_property name="isExpanded"></obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/dut/RV1/Decoder1/Opcode" type="array">
+      <obj_property name="ElementShortName">Opcode[6:0]</obj_property>
+      <obj_property name="ObjectShortName">Opcode[6:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/dut/RV1/Decoder1/Funct3" type="array">
+      <obj_property name="ElementShortName">Funct3[2:0]</obj_property>
+      <obj_property name="ObjectShortName">Funct3[2:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/dut/RV1/Decoder1/Funct7" type="array">
+      <obj_property name="ElementShortName">Funct7[6:0]</obj_property>
+      <obj_property name="ObjectShortName">Funct7[6:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/dut/RV1/ALUResult" type="array">
+      <obj_property name="ElementShortName">ALUResult[31:0]</obj_property>
+      <obj_property name="ObjectShortName">ALUResult[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/dut/RV1/Result1" type="array">
+      <obj_property name="ElementShortName">Result1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">Result1[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/dut/RV1/Result2" type="array">
+      <obj_property name="ElementShortName">Result2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">Result2[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/dut/RV1/ReadData" type="array">
+      <obj_property name="ElementShortName">ReadData[31:0]</obj_property>
+      <obj_property name="ObjectShortName">ReadData[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/dut/DMEM" type="array">
+      <obj_property name="ElementShortName">DMEM[0:127][31:0]</obj_property>
+      <obj_property name="ObjectShortName">DMEM[0:127][31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/dut/RV1/rs1" type="array">
+      <obj_property name="ElementShortName">rs1[4:0]</obj_property>
+      <obj_property name="ObjectShortName">rs1[4:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_Wrapper_BF/dut/RV1/rs2" type="array">
+      <obj_property name="ElementShortName">rs2[4:0]</obj_property>
+      <obj_property name="ObjectShortName">rs2[4:0]</obj_property>
+   </wvobject>
+</wave_config>

@@ -38,7 +38,7 @@ module Decoder(
     output reg [1:0] PCS,		// 00 for non-control, 01 for conditional branch, 10 for jal, 11 for jalr
     output reg RegWrite,		// Asserted only by instructions which write to register file (load, auipc, lui, DPImm, DPReg);
     output reg MemWrite,		// Asserted only by store (sw)
-    output reg MemtoReg,		// Asserted only by load (lw)
+    output reg [1:0] MemtoReg,		// Asserted only by load (lw), got extended to handle the output of Mcycle
     output reg [1:0] ALUSrcA, 	// Needed for lui, auipic. Refer to the microarchitecture for its use. Uncomment wire and port map in RV.v as well
     output reg [1:0] ALUSrcB,		// Asserted by all instructions which use an immediate (load, store, lui, auipc, DPImm). Needs to be expanded to a 2-bit signal to support link functionality for jal, jalr. Change wire width in RV.v as well
     output reg [2:0] ImmSrc, 	// 000 for U, 010 for UJ, 011 for I, 110 for S, 111 for SB.
@@ -61,7 +61,7 @@ module Decoder(
                 PCS = 2'b00;
                 RegWrite = 1'b1;
                 MemWrite = 1'b0;
-                MemtoReg = 1'b0;
+                MemtoReg = 2'b00;
                 ALUSrcA = 2'bX0; // x0
                 ALUSrcB = 2'bX0; // x0
                 ImmSrc = 3'bXXX; // xxx
@@ -71,18 +71,29 @@ module Decoder(
                 if (Funct7[0] == 1'b1) begin // multiply and divide
                     Start = 1'b1; 
                     case(Funct3)
-                        3'h0: // mul
+                        3'h0: begin // mul
+                            MCycleOp = 2'b00;
+                            MemtoReg = 2'b11;
+                        end
                         3'h1: begin // mulh
                             MCycleOp = 2'b00;
+                            MemtoReg = 2'b01;
                         end
                         3'h3: begin // mulhu
                             MCycleOp = 2'b01;
+                            MemtoReg = 2'b01;
                         end
                         3'h4: begin // div
                             MCycleOp = 2'b10;
+                            MemtoReg = 2'b11;
                         end
                         3'h5: begin // divu
                             MCycleOp = 2'b11;
+                            MemtoReg = 2'b11;
+                        end
+                        default: begin 
+                            MCycleOp = 2'bxx;
+                            MemtoReg = 2'bxx;
                         end
                     endcase
                 end
@@ -91,7 +102,7 @@ module Decoder(
                 PCS = 2'b00;
                 RegWrite = 1'b1;
                 MemWrite = 1'b0;
-                MemtoReg = 1'b0;
+                MemtoReg = 2'b00;
                 ALUSrcA = 2'bX0; // x0
                 ALUSrcB = 2'b11;
                 ImmSrc = 3'b011;
@@ -108,7 +119,7 @@ module Decoder(
                 PCS = 2'b00;
                 RegWrite = 1'b1;
                 MemWrite = 1'b0;
-                MemtoReg = 1'b1;
+                MemtoReg = 2'b10;
                 ALUSrcA = 2'bX0; // x0
                 ALUSrcB = 2'b11;
                 ImmSrc = 3'b011;
@@ -120,7 +131,7 @@ module Decoder(
                 PCS = 2'b00;
                 RegWrite = 1'b0;
                 MemWrite = 1'b1;
-                MemtoReg = 1'bX; // x
+                MemtoReg = 2'bXX; // xx
                 ALUSrcA = 2'bX0; // x0
                 ALUSrcB = 2'b11;
                 ImmSrc = 3'b110;
@@ -132,7 +143,7 @@ module Decoder(
                 PCS = 2'b01;
                 RegWrite = 1'b0;
                 MemWrite = 1'b0;
-                MemtoReg = 1'bX; // x
+                MemtoReg = 2'bXX; // xx
                 ALUSrcA = 2'bX0; // x0
                 ALUSrcB = 2'bX0; // x0
                 ImmSrc = 3'b111;
@@ -144,7 +155,7 @@ module Decoder(
                 PCS = 2'b10;
                 RegWrite = 1'b1;
                 MemWrite = 1'b0;
-                MemtoReg = 1'b0;
+                MemtoReg = 2'b00;
                 ALUSrcA = 2'b11;
                 ALUSrcB = 2'b01;
                 ImmSrc = 3'b010;
@@ -156,7 +167,7 @@ module Decoder(
                 PCS = 2'b00;
                 RegWrite = 1'b1;
                 MemWrite = 1'b0;
-                MemtoReg = 1'b0;
+                MemtoReg = 2'b00;
                 ALUSrcA = 2'b11;
                 ALUSrcB = 2'b11;
                 ImmSrc = 3'b000;
@@ -168,7 +179,7 @@ module Decoder(
                 PCS = 2'b00;
                 RegWrite = 1'b1;
                 MemWrite = 1'b0;
-                MemtoReg = 1'b0;
+                MemtoReg = 2'b00;
                 ALUSrcA = 2'b01;
                 ALUSrcB = 2'b11;
                 ImmSrc = 3'b000;
@@ -180,7 +191,7 @@ module Decoder(
                 PCS = 2'b11;
                 RegWrite = 1'b1;
                 MemWrite = 1'b0;
-                MemtoReg = 1'b0;
+                MemtoReg = 2'b00;
                 ALUSrcA = 2'b11;
                 ALUSrcB = 2'b01;
                 ImmSrc = 3'b011;
