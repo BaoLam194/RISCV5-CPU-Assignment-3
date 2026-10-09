@@ -223,8 +223,8 @@ module RV #(
                 );                
     
     // multiply and divide is DP Reg instruction, so no need to have multiplex for this
-    assign Operand1 = ALUSrcA;
-    assign Operand2 = ALUSrcB;
+    assign Operand1 = Src_A;
+    assign Operand2 = Src_B;
     MCycle #(.width(32)) MCycle1(
                 CLK,
                 RESET,
