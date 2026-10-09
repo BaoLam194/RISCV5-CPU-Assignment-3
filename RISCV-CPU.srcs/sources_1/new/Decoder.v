@@ -91,6 +91,14 @@ module Decoder(
                             MCycleOp = 2'b11;
                             MemtoReg = 2'b11;
                         end
+                        3'h6: begin // rem
+                            MCycleOp = 2'b10;
+                            MemtoReg = 2'b01;
+                        end
+                        3'h7: begin // remu
+                            MCycleOp = 2'b11;
+                            MemtoReg = 2'b01;
+                        end
                         default: begin 
                             MCycleOp = 2'bxx;
                             MemtoReg = 2'bxx;

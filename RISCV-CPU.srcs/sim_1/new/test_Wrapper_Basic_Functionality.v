@@ -172,10 +172,30 @@ module test_Wrapper_BF #(
         wait(dut.RV1.MCycle1.Busy);
         wait(~dut.RV1.MCycle1.Busy);
         #10; 
-        #10; //nop is executed
+        #10; 
         assert(dut.RV1.RegFile1.RegBank[10] === 32'h16d07200) else `ERROR("mul instruction fails", 32'h16d07200, dut.RV1.RegFile1.RegBank[10]);
         assert(dut.RV1.RegFile1.RegBank[5] === 32'hffffffc0) else `ERROR("mulh instruction fails", 32'hffffffc0, dut.RV1.RegFile1.RegBank[5]);
         assert(dut.RV1.RegFile1.RegBank[7] === 32'h004000f0) else `ERROR("mulhu instruction fails", 32'h004000f0, dut.RV1.RegFile1.RegBank[7]);
+        
+        // div line 163 is executed
+        wait(dut.RV1.MCycle1.Busy);
+        wait(~dut.RV1.MCycle1.Busy);
+        // divu line 164 is executed
+        wait(dut.RV1.MCycle1.Busy);
+        wait(~dut.RV1.MCycle1.Busy);
+        // rem line 165 is executed
+        wait(dut.RV1.MCycle1.Busy);
+        wait(~dut.RV1.MCycle1.Busy);
+        // remu line 166 is executed
+        wait(dut.RV1.MCycle1.Busy);
+        wait(~dut.RV1.MCycle1.Busy);
+        #10;
+        #10; // nop is executed
+        assert(dut.RV1.RegFile1.RegBank[19] === 32'hffa4be38) else `ERROR("div instruction fails", 32'hffa4be38, dut.RV1.RegFile1.RegBank[19]);
+        assert(dut.RV1.RegFile1.RegBank[26] === 32'h0000c0c4) else `ERROR("divu instruction fails", 32'h0000c0c4, dut.RV1.RegFile1.RegBank[26]);
+        assert(dut.RV1.RegFile1.RegBank[20] === 32'h0) else `ERROR("rem instruction fails", 32'h0, dut.RV1.RegFile1.RegBank[20]);
+        assert(dut.RV1.RegFile1.RegBank[27] === 32'h0c) else `ERROR("remu instruction fails", 32'h0c, dut.RV1.RegFile1.RegBank[27]);
+
         // ---------------------------------------------------------
         // TEST SUMMARY
         // ---------------------------------------------------------

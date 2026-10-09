@@ -160,6 +160,10 @@ jal_return:
     mul a0, t1, s1			# 0x0x16d07200
     mulh t0, t1, s1			# -64
     mulhu t2, t1, s1		# 0x4000f0
+	div s3, a0, t0 			# 0xffa4be38
+    divu s10, t3, t4		# 0x0000c0c4
+	rem s4, a0, t0			# 0
+    remu s11, t3, t4		# 0x0c
 finish:
 	nop
 
