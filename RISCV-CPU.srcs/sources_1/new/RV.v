@@ -149,7 +149,7 @@ module RV #(
 
     end 
     assign WriteData = RD2;
-    assign WE = RegWrite & ~Busy;
+    assign WE = RegWrite & ~Busy & ~RESET;
     RegFile RegFile1( 
                     CLK,
                     WE,

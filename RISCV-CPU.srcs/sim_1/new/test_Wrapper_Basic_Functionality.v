@@ -214,8 +214,15 @@ module test_Wrapper_BF #(
 
         $display("============================================================");
 
+        if (error_count != 0)
+            $fatal(1, "%0d basic-functionality test failure(s)", error_count);
         $finish;
 	end
+
+    initial begin
+        #20_000;
+        $fatal(1, "Basic-functionality testbench timeout");
+    end
 	// GENERATE CLOCK       
     always          
     begin
