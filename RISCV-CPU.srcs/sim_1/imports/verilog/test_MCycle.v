@@ -186,12 +186,12 @@ module test_MCycle(
             sa = a[3] ? a - 16 : a ;     // signed value of a
             sb = b[3] ? b - 16 : b ;
             case (op)
-                2'b00: begin // signed multiply, 2*width cycles
+                2'b00: begin
                     pq = sa * sb ;
                     exp_prod = pq[7:0] ;
                     exp_q = exp_prod[3:0] ;
                     exp_r = exp_prod[7:4] ;
-                    exp_cycles = 8 ;
+                    exp_cycles = 2 ;
                 end
                 2'b01: begin // unsigned multiply, width cycles
                     pq = a * b ;

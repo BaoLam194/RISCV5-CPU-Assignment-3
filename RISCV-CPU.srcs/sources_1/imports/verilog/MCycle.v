@@ -55,7 +55,8 @@ module MCycle
     // Last value of count for each multiplication. Part-selected where they are
     // used, so the comparisons against count do not silently widen it.
     localparam COUNT_LAST_W  = width - 1 ;    // unsigned multiply
-    localparam COUNT_LAST_2W = 2*width - 1 ;  // signed multiply, whose operands are sign extended to 2*width
+    localparam BOOTH_WIDTH = width + (width % 2) ;
+    localparam COUNT_LAST_BOOTH = BOOTH_WIDTH/2 - 1 ;
 
     reg state = IDLE ;
     reg n_state = IDLE ;
@@ -65,6 +66,8 @@ module MCycle
     reg [2*width-1:0] temp_sum = 0 ;
     reg [2*width-1:0] shifted_op1 = 0 ;
     reg [2*width-1:0] shifted_op2 = 0 ;
+    reg signed [BOOTH_WIDTH+1:0] booth_m = 0 ;
+    reg signed [2*BOOTH_WIDTH+2:0] booth_p = 0 ;
 
     // Division sign handling. Signed division is done on absolute values,
     // so the signs are remembered here and applied to the results at the end.
@@ -84,6 +87,8 @@ module MCycle
     reg [2*width-1:0] n_shifted_op2 ;
     reg [width-1:0] n_Result1 ;
     reg [width-1:0] n_Result2 ;
+    reg signed [BOOTH_WIDTH+1:0] n_booth_m ;
+    reg signed [2*BOOTH_WIDTH+2:0] n_booth_p ;
     
     //additional declare
     reg n_neg_r;
@@ -119,6 +124,8 @@ module MCycle
         n_temp_sum = temp_sum ;
         n_shifted_op1 = shifted_op1 ;
         n_shifted_op2 = shifted_op2 ;
+        n_booth_m = booth_m ;
+        n_booth_p = booth_p ;
         n_Result1 = Result1 ;
         n_Result2 = Result2 ;
         n_neg_q = neg_q ;
@@ -132,6 +139,8 @@ module MCycle
             n_temp_sum = 0 ;
             n_shifted_op1 = { {width{~MCycleOp[0] & Operand1[width-1]}}, Operand1 } ; // sign extend the operands
             n_shifted_op2 = { {width{~MCycleOp[0] & Operand2[width-1]}}, Operand2 } ;
+            n_booth_m = {{(BOOTH_WIDTH+2-width){Operand1[width-1]}}, Operand1} ;
+            n_booth_p = {{(BOOTH_WIDTH+2){1'b0}}, {(BOOTH_WIDTH-width){Operand2[width-1]}}, Operand2, 1'b0} ;
         
             // Division set-up. MCycleOp[0] = 0 means signed.
             // Quotient is negative when the operand signs differ.
@@ -151,9 +160,22 @@ module MCycle
 
         // Guarded so that the cycle in which Busy falls - the one the processor uses to write the result back - does not run another iteration over it, and so that the results are held while idle.
         if( n_state == COMPUTING ) begin
-            if( ~MCycleOp[1] ) begin // Multiply
-                // if( ~MCycleOp[0] ), takes 2*'width' cycles to execute, returns signed(Operand1)*signed(Operand2)
-
+            if( MCycleOp == 2'b00 ) begin
+                case(n_booth_p[2:0])
+                    3'b001, 3'b010: n_booth_p[2*BOOTH_WIDTH+2:BOOTH_WIDTH+1] = n_booth_p[2*BOOTH_WIDTH+2:BOOTH_WIDTH+1] + n_booth_m ;
+                    3'b011: n_booth_p[2*BOOTH_WIDTH+2:BOOTH_WIDTH+1] = n_booth_p[2*BOOTH_WIDTH+2:BOOTH_WIDTH+1] + (n_booth_m <<< 1) ;
+                    3'b100: n_booth_p[2*BOOTH_WIDTH+2:BOOTH_WIDTH+1] = n_booth_p[2*BOOTH_WIDTH+2:BOOTH_WIDTH+1] - (n_booth_m <<< 1) ;
+                    3'b101, 3'b110: n_booth_p[2*BOOTH_WIDTH+2:BOOTH_WIDTH+1] = n_booth_p[2*BOOTH_WIDTH+2:BOOTH_WIDTH+1] - n_booth_m ;
+                    default: begin end
+                endcase
+                n_booth_p = n_booth_p >>> 2 ;
+                if( n_count == COUNT_LAST_BOOTH[7:0] )
+                    n_done = 1'b1 ;
+                n_count = n_count + 1 ;
+                n_Result1 = n_booth_p[width:1] ;
+                n_Result2 = n_booth_p[2*width:width+1] ;
+            end
+            else if( ~MCycleOp[1] ) begin // Multiply
                 // if( MCycleOp[0] ), takes 'width' cycles to execute, returns unsigned(Operand1)*unsigned(Operand2)
                 if( n_shifted_op2[0] ) // add only if b0 = 1
                     n_temp_sum = n_temp_sum + n_shifted_op1 ; // partial product for multiplication
@@ -161,7 +183,7 @@ module MCycle
                 n_shifted_op2 = {1'b0, n_shifted_op2[2*width-1 : 1]} ;
                 n_shifted_op1 = {n_shifted_op1[2*width-2 : 0], 1'b0} ;
 
-                if( (MCycleOp[0] & n_count == COUNT_LAST_W[7:0]) | (~MCycleOp[0] & n_count == COUNT_LAST_2W[7:0]) ) // last cycle?
+                if( n_count == COUNT_LAST_W[7:0] ) // last cycle?
                     n_done = 1'b1 ;
 
                 n_count = n_count + 1 ;
@@ -220,6 +242,8 @@ module MCycle
         temp_sum <= n_temp_sum ;
         shifted_op1 <= n_shifted_op1 ;
         shifted_op2 <= n_shifted_op2 ;
+        booth_m <= n_booth_m ;
+        booth_p <= n_booth_p ;
         Result1 <= n_Result1 ;
         Result2 <= n_Result2 ;
         neg_q <= n_neg_q ;
