@@ -125,8 +125,7 @@ module RV #(
     wire [31:0] PC_Offset ;
     wire [31:0] Result ;
     
-    assign MemRead = MemtoReg; // This is needed for the proper functionality of some devices such as UART CONSOLE
-    assign WE_PC = 1 ;  // Will need to control it for multi-cycle operations (Multiplication, Division) and/or Pipelining with hazard hardware.
+    assign MemRead = (MemtoReg == 2'b10); // This is needed for the proper functionality of some devices such as UART CONSOLE
 
     assign ReadData = ReadData_in;       // Change datapath as appropriate if supporting lb/lbu/lh/lhu
     assign WriteData_out = WriteData;    // Change datapath as appropriate if supporting sb/sh
@@ -150,7 +149,7 @@ module RV #(
 
     end 
     assign WriteData = RD2;
-    assign WE = RegWrite;
+    assign WE = RegWrite & ~Busy;
     RegFile RegFile1( 
                     CLK,
                     WE,
