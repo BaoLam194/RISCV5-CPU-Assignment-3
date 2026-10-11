@@ -57,6 +57,8 @@ module test_Wrapper_BF #(
 	
 	// Instantiate UUT
     Wrapper dut(DIP, PB, LED_OUT, LED_PC, SEVENSEGHEX, UART_TX, UART_TX_ready, UART_TX_valid, UART_RX, UART_RX_valid, UART_RX_ack, OLED_Write, OLED_Col, OLED_Row, OLED_Data, ACCEL_Data, ACCEL_DReady, RESET, CLK) ;
+    wire booth_tests_done;
+    test_Wrapper_MCycle #(.FINISH_ON_DONE(0)) booth_tests(.done(booth_tests_done));
 
 	
 	// Note: This testbench is for DIP_to_LED program. Other assembly programs require appropriate modifications.
@@ -196,6 +198,8 @@ module test_Wrapper_BF #(
         assert(dut.RV1.RegFile1.RegBank[20] === 32'h0) else `ERROR("rem instruction fails", 32'h0, dut.RV1.RegFile1.RegBank[20]);
         assert(dut.RV1.RegFile1.RegBank[27] === 32'h0c) else `ERROR("remu instruction fails", 32'h0c, dut.RV1.RegFile1.RegBank[27]);
 
+        wait (booth_tests_done);
+
         // ---------------------------------------------------------
         // TEST SUMMARY
         // ---------------------------------------------------------
@@ -220,7 +224,7 @@ module test_Wrapper_BF #(
 	end
 
     initial begin
-        #20_000;
+        #2_000_000;
         $fatal(1, "Basic-functionality testbench timeout");
     end
 	// GENERATE CLOCK       

@@ -164,7 +164,11 @@ module test_Wrapper_assigned;
 	end
 endmodule
 
-module test_Wrapper_MCycle;
+module test_Wrapper_MCycle #(
+    parameter FINISH_ON_DONE = 1
+)(
+    output reg done = 0
+);
     localparam [31:0] PC_BASE = 32'h00400000;
     reg CLK = 0;
     reg RESET = 1;
@@ -490,11 +494,12 @@ module test_Wrapper_MCycle;
         reset_program(8);
         reset_program(15);
         $display("ALL CPU MCYCLE TESTS PASSED (%0d programs, %0d multicycle retirements)", programs, multicycle_checks);
-        $finish;
+        done = 1;
+        if (FINISH_ON_DONE) $finish;
     end
 
     initial begin
         #2_000_000;
-        $fatal(1, "CPU multicycle testbench timeout");
+        if (!done) $fatal(1, "CPU multicycle testbench timeout");
     end
 endmodule
