@@ -151,7 +151,7 @@ module test_MCycle(
     initial begin
         #20_000_000 ;
         $display("TIMEOUT: simulation hung, Busy probably never fell") ;
-        $finish ;
+        $fatal(1, "MCycle testbench timeout") ;
     end
 
     // ------------------------------------------------------------------
@@ -181,17 +181,18 @@ module test_MCycle(
     // starting from idle), Busy low and results held in the idle cycle afterwards.
     // ------------------------------------------------------------------
     task run_op(input [1:0] op, input [3:0] a, input [3:0] b, input hold);
+        reg started_from_idle;
         begin
             // ---- reference model ----
             sa = a[3] ? a - 16 : a ;     // signed value of a
             sb = b[3] ? b - 16 : b ;
             case (op)
-                2'b00: begin // signed multiply, 2*width cycles
+                2'b00: begin
                     pq = sa * sb ;
                     exp_prod = pq[7:0] ;
                     exp_q = exp_prod[3:0] ;
                     exp_r = exp_prod[7:4] ;
-                    exp_cycles = 8 ;
+                    exp_cycles = 2 ;
                 end
                 2'b01: begin // unsigned multiply, width cycles
                     pq = a * b ;
@@ -217,13 +218,14 @@ module test_MCycle(
             endcase
 
             // ---- apply stimulus ----
+            started_from_idle = (dut.state == 1'b0) ;
             MCycleOp = op ;
             Operand1 = a ;
             Operand2 = b ;
             busy_cycles = 0 ;
             Start = 1'b1 ;
 
-            if (!hold) begin
+            if (started_from_idle) begin
                 #1 ;
                 if (Busy !== 1'b1) begin   // Mealy output: Busy must rise as soon as Start does
                     errors = errors + 1 ;
@@ -440,7 +442,256 @@ module test_MCycle(
         else
             $display("%0d ERROR(S) in %0d result checks", errors, checks) ;
         $display("==================================================") ;
+        if (errors != 0)
+            $fatal(1, "%0d MCycle test failure(s)", errors) ;
         $finish ;
     end
 
+endmodule
+
+module test_MCycle_Booth #(parameter WIDTH = 32);
+    localparam BOOTH_CYCLES = (WIDTH+1)/2;
+    localparam [7:0] REQUIRED_RECODES = (WIDTH == 3) ? 8'hd7 : 8'hff;
+    localparam [WIDTH-1:0] MIN_SIGNED = {1'b1, {(WIDTH-1){1'b0}}};
+    localparam [WIDTH-1:0] MAX_SIGNED = {1'b0, {(WIDTH-1){1'b1}}};
+
+    reg CLK = 0;
+    reg RESET = 1;
+    reg Start = 0;
+    reg [1:0] MCycleOp = 0;
+    reg [WIDTH-1:0] Operand1 = 0;
+    reg [WIDTH-1:0] Operand2 = 0;
+    wire [WIDTH-1:0] Result1;
+    wire [WIDTH-1:0] Result2;
+    wire Busy;
+    integer checks = 0;
+    integer busy_cycles = 0;
+    reg [7:0] recodes_seen = 0;
+    reg [31:0] random_state = 32'h00003207;
+    reg [WIDTH-1:0] edge_values [0:8];
+    reg [WIDTH-1:0] alternating = 0;
+    reg [WIDTH-1:0] random_a, random_b;
+    reg [1:0] random_op;
+    integer i, j;
+
+    MCycle #(.width(WIDTH)) dut(
+        CLK, RESET, Start, MCycleOp, Operand1, Operand2,
+        Result1, Result2, Busy
+    );
+
+    always #5 CLK = ~CLK;
+
+    always @(posedge CLK) begin
+        if (Busy) begin
+            busy_cycles = busy_cycles + 1;
+            if (MCycleOp == 2'b00) begin
+                if (dut.state == 1'b0)
+                    recodes_seen[{Operand2[1:0], 1'b0}] = 1'b1;
+                else
+                    recodes_seen[dut.booth_p[2:0]] = 1'b1;
+            end
+        end
+    end
+
+    function [31:0] next_random;
+        input [31:0] previous;
+        reg [31:0] value;
+        begin
+            value = previous ^ (previous << 13);
+            value = value ^ (value >> 17);
+            next_random = value ^ (value << 5);
+        end
+    endfunction
+
+    task run_op;
+        input [1:0] op;
+        input [WIDTH-1:0] a, b;
+        input hold;
+        reg signed [2*WIDTH-1:0] signed_a, signed_b;
+        reg [2*WIDTH-1:0] product;
+        reg [WIDTH-1:0] expected1, expected2;
+        reg started_from_idle;
+        integer expected_cycles;
+        begin
+            signed_a = {{WIDTH{a[WIDTH-1]}}, a};
+            signed_b = {{WIDTH{b[WIDTH-1]}}, b};
+            case (op)
+                2'b00: begin
+                    product = signed_a * signed_b;
+                    expected1 = product[WIDTH-1:0];
+                    expected2 = product[2*WIDTH-1:WIDTH];
+                    expected_cycles = BOOTH_CYCLES;
+                end
+                2'b01: begin
+                    product = {{WIDTH{1'b0}}, a} * {{WIDTH{1'b0}}, b};
+                    expected1 = product[WIDTH-1:0];
+                    expected2 = product[2*WIDTH-1:WIDTH];
+                    expected_cycles = WIDTH;
+                end
+                2'b10: begin
+                    if (b == 0) $fatal(1, "Zero divisor in test");
+                    expected1 = signed_a / signed_b;
+                    expected2 = signed_a % signed_b;
+                    expected_cycles = WIDTH;
+                end
+                2'b11: begin
+                    if (b == 0) $fatal(1, "Zero divisor in test");
+                    expected1 = a / b;
+                    expected2 = a % b;
+                    expected_cycles = WIDTH;
+                end
+            endcase
+            @(negedge CLK);
+            started_from_idle = (dut.state == 1'b0);
+            MCycleOp = op;
+            Operand1 = a;
+            Operand2 = b;
+            busy_cycles = 0;
+            Start = 1;
+            #1;
+            if (started_from_idle) begin
+                if (Busy !== 1'b1) $fatal(1, "Busy did not rise from idle");
+            end
+            else begin
+                if (Busy !== 1'b0) $fatal(1, "Missing completion interval");
+                @(posedge CLK);
+                #1;
+                if (Busy !== 1'b1) $fatal(1, "Back-to-back operation not accepted");
+            end
+            wait (Busy === 1'b1);
+            wait (Busy === 1'b0);
+            #1;
+            checks = checks + 1;
+            if (Result1 !== expected1 || Result2 !== expected2 || busy_cycles != expected_cycles)
+                $fatal(1, "WIDTH=%0d op=%b a=%h b=%h result=%h:%h expected=%h:%h cycles=%0d expected_cycles=%0d",
+                    WIDTH, op, a, b, Result2, Result1, expected2, expected1, busy_cycles, expected_cycles);
+            if (!hold) begin
+                Start = 0;
+                @(posedge CLK);
+                #1;
+                if (Busy !== 1'b0 || Result1 !== expected1 || Result2 !== expected2)
+                    $fatal(1, "Idle result retention failed");
+            end
+        end
+    endtask
+
+    task check_idle;
+        reg [WIDTH-1:0] saved1, saved2;
+        integer step;
+        begin
+            saved1 = Result1;
+            saved2 = Result2;
+            for (step = 0; step < 5; step = step + 1) begin
+                @(negedge CLK);
+                Operand1 = ~Operand1;
+                Operand2 = Operand2 + 1'b1;
+                MCycleOp = MCycleOp + 1'b1;
+                @(posedge CLK);
+                #1;
+                if (Busy !== 1'b0 || Result1 !== saved1 || Result2 !== saved2)
+                    $fatal(1, "Results changed with inputs while idle");
+            end
+        end
+    endtask
+
+    task reset_multiply;
+        input integer completed_iterations;
+        begin
+            @(negedge CLK);
+            MCycleOp = 2'b00;
+            Operand1 = MIN_SIGNED;
+            Operand2 = MAX_SIGNED;
+            Start = 1;
+            #1;
+            if (Busy !== 1'b1) $fatal(1, "Reset test did not start");
+            repeat (completed_iterations) @(posedge CLK);
+            #1;
+            if (Busy !== 1'b1) $fatal(1, "Reset test reached completion too early");
+            RESET = 1;
+            #1;
+            if (Busy !== 1'b0) $fatal(1, "Busy did not clear during reset");
+            @(posedge CLK);
+            #1;
+            Start = 0;
+            RESET = 0;
+            @(posedge CLK);
+            #1;
+            if (Busy !== 1'b0) $fatal(1, "Busy did not remain idle after reset");
+            run_op(2'b00, MIN_SIGNED, {WIDTH{1'b1}}, 1'b0);
+            run_op(2'b11, MAX_SIGNED, {{(WIDTH-1){1'b0}}, 1'b1}, 1'b0);
+        end
+    endtask
+
+    initial begin
+        if (WIDTH < 3 || WIDTH > 32) $fatal(1, "Test supports widths 3 through 32");
+        for (i = 0; i < WIDTH; i = i + 1)
+            alternating[i] = i % 2;
+        edge_values[0] = 0;
+        edge_values[1] = 1;
+        edge_values[2] = {WIDTH{1'b1}};
+        edge_values[3] = 2;
+        edge_values[4] = -2;
+        edge_values[5] = MIN_SIGNED;
+        edge_values[6] = MAX_SIGNED;
+        edge_values[7] = alternating;
+        edge_values[8] = ~alternating;
+        #11;
+        RESET = 0;
+
+        for (i = 0; i < 9; i = i + 1)
+            for (j = 0; j < 9; j = j + 1)
+                run_op(2'b00, edge_values[i], edge_values[j], 1'b0);
+        check_idle;
+
+        if (WIDTH <= 5)
+            for (i = 0; i < (1 << WIDTH); i = i + 1)
+                for (j = 0; j < (1 << WIDTH); j = j + 1)
+                    run_op(2'b00, i, j, 1'b0);
+
+        for (i = 0; i < WIDTH; i = i + 1) begin
+            run_op(2'b00, MIN_SIGNED, {{(WIDTH-1){1'b0}}, 1'b1} << i, 1'b1);
+            run_op(2'b00, MAX_SIGNED, -({{(WIDTH-1){1'b0}}, 1'b1} << i), 1'b0);
+        end
+
+        for (i = 0; i < 1000; i = i + 1) begin
+            random_state = next_random(random_state);
+            random_a = random_state;
+            random_state = next_random(random_state);
+            random_b = random_state;
+            run_op(2'b00, random_a, random_b, 1'b1);
+        end
+        run_op(2'b00, MIN_SIGNED, MIN_SIGNED, 1'b0);
+
+        for (i = 0; i < 4; i = i + 1)
+            for (j = 0; j < 4; j = j + 1) begin
+                run_op(i, MIN_SIGNED, MAX_SIGNED, 1'b1);
+                run_op(j, MAX_SIGNED, {WIDTH{1'b1}}, 1'b1);
+            end
+        run_op(2'b00, MIN_SIGNED, {WIDTH{1'b1}}, 1'b0);
+
+        for (i = 0; i < 500; i = i + 1) begin
+            random_state = next_random(random_state);
+            random_op = random_state[1:0];
+            random_state = next_random(random_state);
+            random_a = random_state;
+            random_state = next_random(random_state);
+            random_b = random_state;
+            if (random_op[1] && random_b == 0) random_b = 1;
+            run_op(random_op, random_a, random_b, 1'b1);
+        end
+        run_op(2'b00, 1, 1, 1'b0);
+
+        reset_multiply(1);
+        reset_multiply(BOOTH_CYCLES/2);
+        reset_multiply(BOOTH_CYCLES-1);
+        check_idle;
+        if (recodes_seen !== REQUIRED_RECODES) $fatal(1, "Missing Booth recodes: %b", recodes_seen);
+        $display("ALL BOOTH TESTS PASSED (WIDTH=%0d, %0d result checks, recodes=%b)", WIDTH, checks, recodes_seen);
+        $finish;
+    end
+
+    initial begin
+        #20_000_000;
+        $fatal(1, "Booth testbench timeout");
+    end
 endmodule
